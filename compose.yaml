@@ -1,0 +1,31 @@
+name: dementia-node
+services:
+  node:
+    build: .
+    init: true
+    restart: unless-stopped
+    logging:
+      driver: json-file
+      options:
+        max-size: "100m"
+        max-file: "5"
+    ports:
+      - "${VPN_PORT:-51820}:51820/udp"
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    cap_drop:
+      - ALL
+    cap_add:
+      - NET_ADMIN
+      - NET_RAW
+    security_opt:
+      - no-new-privileges:true
+    sysctls:
+      net.ipv4.ip_forward: "1"
+    volumes:
+      - ../state:/var/lib/dementia:Z
+    healthcheck:
+      test: ["CMD-SHELL", "test -f /run/awg-ready && awg show awgp0 public-key >/dev/null"]
+      interval: 3s
+      timeout: 2s
+      retries: 10
