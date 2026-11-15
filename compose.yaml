@@ -1,6 +1,7 @@
 name: dementia-node
 services:
   node:
+    container_name: ${COMPOSE_PROJECT_NAME}
     build: .
     init: true
     restart: unless-stopped
@@ -29,3 +30,7 @@ services:
       interval: 3s
       timeout: 2s
       retries: 10
+
+networks:
+  default:
+    name: ${COMPOSE_PROJECT_NAME}-network
