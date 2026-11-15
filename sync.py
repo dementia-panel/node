@@ -15,6 +15,7 @@ RESTART = BASE / "restart-revision"
 NAME = BASE / "node-name"
 restarted = int(RESTART.read_text()) if RESTART.exists() else 0
 applied_peers = None
+last_sync_error = None
 panel_url, node_id, token = (BASE / "agent.conf").read_text().splitlines()
 url = f"{panel_url}/api/agent/nodes/{node_id}"
 
@@ -94,9 +95,14 @@ def transfer():
 
 
 def sync():
+    global last_sync_error
     try:
         state = request("/state")
     except OSError as error:
+        detail = f"HTTP {error.code}" if isinstance(error, HTTPError) else type(error).__name__
+        if detail != last_sync_error:
+            print(f"Could not refresh node state: {detail}", file=sys.stderr, flush=True)
+            last_sync_error = detail
         if isinstance(error, HTTPError) and error.code in (401, 403):
             state = {"revision": 0, "peers": []}
             save(state)
@@ -106,6 +112,9 @@ def sync():
             state = {"revision": 0, "peers": []}
         apply(state)
     else:
+        if last_sync_error:
+            print("Node state refresh recovered", flush=True)
+            last_sync_error = None
         traffic = None
         try:
             traffic = transfer()
@@ -137,6 +146,7 @@ def sync():
 while True:
     try:
         sync()
-    except (OSError, ValueError, subprocess.SubprocessError) as error:
-        print(f"Node synchronization failed: {type(error).__name__}", file=sys.stderr, flush=True)
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError) as error:
+        detail = f"HTTP {error.code}" if isinstance(error, HTTPError) else type(error).__name__
+        print(f"Node synchronization failed: {detail}", file=sys.stderr, flush=True)
     time.sleep(5)

@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 set -euo pipefail
 umask 077
-exec 3>&1
+exec 3>&1 4>&2
 exec >>/var/log/dementia-install.log 2>&1
+
+stage() {
+    printf 'dementia-stage:%s\n' "$1" >&4
+}
+stage requirements
 
 if (( EUID != 0 )); then
     echo "Installer must run as root"
@@ -37,6 +42,8 @@ for legacy_base in /opt/amnezia-panel /opt/relay; do
     fi
 done
 source_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
+exec 8>/run/lock/dementia-node.lock
+flock -n 8
 install -d -m 0700 "$base" "$base/state"
 exec 9>"$base/install.lock"
 flock -n 9
@@ -50,6 +57,8 @@ if [[ -f "$base/awgp0.conf" ]]; then
     exit 1
 fi
 
+printf '%s\n' "$node_id" > "$base/node-id"
+stage docker
 if ! command -v docker >/dev/null ||
    ! docker compose version >/dev/null 2>&1 ||
    ! docker buildx version >/dev/null 2>&1; then
@@ -86,7 +95,7 @@ REPO
 fi
 
 # Provision the local Engine even if the SSH account has a custom Docker context.
-unset DOCKER_CONTEXT DOCKER_HOST VPN_PORT
+unset DOCKER_CONTEXT DOCKER_HOST VPN_PORT COMPOSE_PROJECT_NAME COMPOSE_FILE
 systemctl enable --now docker
 docker info >/dev/null
 
@@ -99,12 +108,19 @@ printf 'VPN_PORT=%s\n' "$port" > "$base/bundle/.env"
 
 # Build before replacing the agent credential so a failed build leaves the active node intact.
 cd "$base/bundle"
+stage build
 docker compose build
 printf '%s\n%s\n%s\n' "$panel_url" "$node_id" "$token" > "$base/state/agent.conf.tmp"
 mv "$base/state/agent.conf.tmp" "$base/state/agent.conf"
 printf '%s\n' "$node_name" > "$base/state/node-name.tmp"
 mv "$base/state/node-name.tmp" "$base/state/node-name"
-docker compose up -d --no-build --wait --wait-timeout 60
+stage start
+if ! docker compose up -d --no-build --wait --wait-timeout 60; then
+    docker compose ps -a
+    docker compose logs --tail=60 node
+    exit 1
+fi
+stage verify
 
 docker compose exec -T node awg show awgp0 public-key >&3
 awk '$1 == "HeaderProtectionKey" {print $3}' "$base/state/awgp0.conf" >&3
