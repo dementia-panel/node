@@ -26,7 +26,12 @@ services:
     volumes:
       - ../state:/var/lib/dementia:Z
     healthcheck:
-      test: ["CMD-SHELL", "test -f /run/awg-ready && awg show awgp0 public-key >/dev/null"]
+      test:
+        - CMD-SHELL
+        - >-
+          test -f /run/awg-ready &&
+          kill -0 "$$(cat /run/dementia-awg.pid)" "$$(cat /run/dementia-agent.pid)" &&
+          awg show awgp0 public-key >/dev/null
       interval: 3s
       timeout: 2s
       retries: 10

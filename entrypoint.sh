@@ -7,7 +7,7 @@ conf=$state/awgp0.conf
 interface=awgp0
 stage=credentials
 trap 'printf "Node startup failed at %s (exit %s)\n" "$stage" "$?" >&2' ERR
-rm -f /run/awg-ready
+rm -f /run/awg-ready /run/dementia-awg.pid /run/dementia-agent.pid
 test -s "$state/agent.conf"
 
 stage=config
@@ -36,7 +36,7 @@ amneziawg-go --foreground "$interface" &
 vpn_pid=$!
 sync_pid=
 cleanup() {
-    rm -f /run/awg-ready
+    rm -f /run/awg-ready /run/dementia-awg.pid /run/dementia-agent.pid
     if [[ -n $sync_pid ]]; then
         kill "$sync_pid" 2>/dev/null || true
     fi
@@ -67,8 +67,11 @@ iptables -A FORWARD -o "$interface" -m conntrack --ctstate ESTABLISHED,RELATED -
 
 python3 /opt/dementia/sync.py &
 sync_pid=$!
-touch /run/awg-ready
 stage=supervisor
+kill -0 "$vpn_pid" "$sync_pid"
+printf '%s\n' "$vpn_pid" > /run/dementia-awg.pid
+printf '%s\n' "$sync_pid" > /run/dementia-agent.pid
+touch /run/awg-ready
 if wait -n -p child "$vpn_pid" "$sync_pid"; then
     if [[ $child == "$sync_pid" ]]; then
         printf 'Agent requested a node restart\n'
