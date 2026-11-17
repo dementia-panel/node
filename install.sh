@@ -34,7 +34,6 @@ IFS= read -r node_name || true
 [[ $port =~ ^[0-9]{1,5}$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 ))
 
 base=/opt/dementia
-# Preserve keys from installations created before the Dementia rename.
 for legacy_base in /opt/amnezia-panel /opt/relay; do
     if [[ -d "$legacy_base" && ! -e "$base" ]]; then
         echo "Legacy node installation detected. Migrate its state before installing dementia."
@@ -94,7 +93,6 @@ REPO
     apt-get install -y "${packages[@]}"
 fi
 
-# Provision the local Engine even if the SSH account has a custom Docker context.
 unset DOCKER_CONTEXT DOCKER_HOST VPN_PORT COMPOSE_PROJECT_NAME COMPOSE_FILE
 systemctl enable --now docker
 docker info >/dev/null
@@ -106,7 +104,6 @@ done
 printf '%s\n' "$node_id" > "$base/node-id"
 printf 'VPN_PORT=%s\n' "$port" > "$base/bundle/.env"
 
-# Build before replacing the agent credential so a failed build leaves the active node intact.
 cd "$base/bundle"
 stage build
 docker compose build

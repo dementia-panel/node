@@ -129,7 +129,7 @@ def sync():
         restart = state.get("restart_revision", 0)
         if restart > restarted:
             write_atomic(RESTART, str(restart))
-            # The supervisor exits when this agent exits, so Docker restarts both processes.
+
             sys.exit(0)
         payload = {"revision": state["revision"]}
         if restarted:
