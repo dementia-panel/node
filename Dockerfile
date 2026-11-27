@@ -1,9 +1,8 @@
 FROM golang:1.25.11-bookworm AS build
 RUN apt-get update && apt-get install -y --no-install-recommends gcc libc6-dev make git ca-certificates \
     && rm -rf /var/lib/apt/lists/*
-RUN version=v3.1.20260812 \
-    && git clone --depth 1 --branch "$version" https://github.com/amnezia-vpn/amneziawg-go.git /src/awg-go \
-    && git clone --depth 1 --branch "$version" https://github.com/amnezia-vpn/amneziawg-tools.git /src/tools \
+RUN git clone --depth 1 --branch v3.1.20261116 https://github.com/amnezia-vpn/amneziawg-go.git /src/awg-go \
+    && git clone --depth 1 --branch v3.1.20260812 https://github.com/amnezia-vpn/amneziawg-tools.git /src/tools \
     && make -C /src/awg-go \
     && make -C /src/tools/src
 

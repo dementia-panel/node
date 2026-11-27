@@ -30,8 +30,11 @@ IFS= read -r token
 IFS= read -r port
 node_name=
 IFS= read -r node_name || true
+release_tag=
+IFS= read -r release_tag || true
 [[ $panel_url == https://* && $node_id =~ ^[0-9a-f-]{36}$ && $token =~ ^[A-Za-z0-9_-]{43}$ ]]
 [[ $port =~ ^[0-9]{1,5}$ ]] && (( 10#$port >= 1 && 10#$port <= 65535 ))
+[[ -z $release_tag || $release_tag =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]]
 
 base=/opt/dementia
 for legacy_base in /opt/amnezia-panel /opt/relay; do
@@ -98,9 +101,13 @@ systemctl enable --now docker
 docker info >/dev/null
 
 install -d -m 0700 "$base/bundle"
-for file in compose.yaml Dockerfile entrypoint.sh sync.py; do
+for file in compose.yaml Dockerfile entrypoint.sh sync.py update.sh; do
     install -m 0600 "$source_dir/$file" "$base/bundle/$file"
 done
+if [[ -n $release_tag ]]; then
+    printf '%s\n' "$release_tag" > "$base/bundle/release-tag"
+    printf '%s\n' "$release_tag" > "$base/state/release-tag"
+fi
 printf '%s\n' "$node_id" > "$base/node-id"
 printf 'VPN_PORT=%s\n' "$port" > "$base/bundle/.env"
 
@@ -119,5 +126,6 @@ if ! docker compose up -d --no-build --wait --wait-timeout 60; then
 fi
 stage verify
 
+bash "$base/bundle/update.sh" --register-only
 docker compose exec -T node awg show awgp0 public-key >&3
 awk '$1 == "HeaderProtectionKey" {print $3}' "$base/state/awgp0.conf" >&3

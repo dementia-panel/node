@@ -12,6 +12,7 @@ os.umask(0o077)
 BASE = Path("/var/lib/dementia")
 STATE = BASE / "state.json"
 RESTART = BASE / "restart-revision"
+VERSION = BASE / "release-tag"
 NAME = BASE / "node-name"
 restarted = int(RESTART.read_text()) if RESTART.exists() else 0
 applied_peers = None
@@ -132,6 +133,8 @@ def sync():
 
             sys.exit(0)
         payload = {"revision": state["revision"]}
+        if VERSION.exists():
+            payload["node_version"] = VERSION.read_text().strip()
         if restarted:
             payload["restarted_revision"] = restarted
         try:
